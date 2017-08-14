@@ -38,7 +38,9 @@ def LoadDataSet(files):
 
 def BatchData(labels, imgDatas, batch_size):
     num_data = len(labels)
-    idxs = np.random.permutation(num_data)
+    rnd_idxs = np.random.permutation(num_data)
+    labels = [labels[idx] for idx in rnd_idxs]
+    imgDatas = [imgDatas[idx] for idx in rnd_idxs]
     for i in range(0, num_data, batch_size):
         yield labels[i:i+batch_size],imgDatas[i:i+batch_size]
 
@@ -50,16 +52,26 @@ def PreprocessBatchData(labels, imgDatas):
     return batch_labels,batch_imgDatas
 
 def DataArguement(imgData):
-    pass
+    '''
+    imgData = tf.image.random_flip_left_right(imgData)
+    imgData = tf.image.random_brightness(imgData)
+    imgData = tf.image.random_contrast(imgData)
+    '''
+    pad_imgData = tf.image.resize_image_with_crop_or_pad(imgData, IMG_HEIGHT+8, IMG_WIDTH+8)
+    crop_imgData = tf.random_crop(pad_imgData, [IMG_HEIGHT,IMG_WIDTH,IMG_CHN])
+    return crop_imgData
 
-def Train(labels, imgDatas, num_epochs=300, batch_size=64):
+def Train(labels, imgDatas, num_epochs=300, batch_size=64, data_arguement=True):
     sess = tf.Session()
 
     target = tf.placeholder(tf.float32, (None, NUM_CLASS))
     imgData = tf.placeholder(tf.float32, (None, IMG_HEIGHT, IMG_WIDTH, IMG_CHN))
     phase = tf.placeholder(tf.bool)
 
-    cls_score = densenet.DenseNet_CIFAR(imgData, 16, phase)
+    if data_arguement:
+        imgData = DataArguement(imgData)
+
+    cls_score = densenet.DenseNet_CIFAR(imgData, 12, phase)
     loss = densenet.ClassificationLoss(cls_score, target)
 
     optimizer = tf.train.MomentumOptimizer(0.1, 0.9)
@@ -85,6 +97,7 @@ def Train(labels, imgDatas, num_epochs=300, batch_size=64):
 
 
 if __name__ == '__main__':
+    # binary data files of CIFAR dataset
     files = ['D:/Dataset/cifar-10-batches-bin/data_batch_1.bin',
         'D:/Dataset/cifar-10-batches-bin/data_batch_2.bin',
         'D:/Dataset/cifar-10-batches-bin/data_batch_3.bin',

@@ -17,14 +17,29 @@ def DenseBlock(input_layer, growth_rate, num_layer, phase,
 
 def ConvLayer(x, output_channels, ksize=3, stride=1, name='conv_weight'):
     input_channels = int(x.shape[-1])
+    print('[conv %sx%s, input chns:%d, output chns:%d, stride:%d]' 
+        % (ksize,ksize, input_channels, output_channels, stride))
     weight = tf.Variable(
     tf.truncated_normal(shape=(ksize, ksize, input_channels, output_channels), stddev=0.001),
             name=name)
     y = tf.nn.conv2d(x, weight, strides=[1,1,1,1], padding='SAME')
     return y
 
+def FcLayer(x, output_size, name='fc'):
+    input_size = int(x.shape[-1])
+    print('[fc %dx%d]' % (input_size, output_size))
+    weight = tf.Variable(
+    tf.truncated_normal(shape=(input_size, output_size), stddev=0.001),
+        name=name+'_weight')
+    bias = tf.Variable(
+        tf.truncated_normal(shape=(1, output_size), stddev=0.001),
+        name=name+'_bias')
+    y = tf.add(tf.matmul(x, weight), bias)
+    return y
+
 # BN-CONV1x1-AVGPOOL2x2
 def TransitionLayer(input_layers, phase, theta=0.5, dropout=0.0, scope='transition'):
+    print('[TransitionLayer]')
     assert(dropout>=0.0 and dropout<1.0)
     with tf.variable_scope(scope):
         h1 = tf.contrib.layers.batch_norm(
@@ -39,6 +54,7 @@ def TransitionLayer(input_layers, phase, theta=0.5, dropout=0.0, scope='transiti
 
 # BN-ReLU-CONV3x3
 def ConvBlock(input_layers, growth_rate, phase, dropout=0.0, scope='conv_block'):
+    print('[ConvBlock]')
     assert(dropout>=0.0 and dropout<1.0)
     with tf.variable_scope(scope):
         h1 = tf.contrib.layers.batch_norm(
@@ -52,6 +68,7 @@ def ConvBlock(input_layers, growth_rate, phase, dropout=0.0, scope='conv_block')
 
 # BN-ReLU-CONV1x1-BN-ReLU-CONV3x3
 def BottlenectBlock(input_layers, growth_rate, phase, dropout=0.0, scope='bottlenect_bock'):
+    print('[BottlenectBlock]')
     assert(dropout>=0.0 and dropout<1.0)
     with tf.variable_scope(scope):
         h1 = tf.contrib.layers.batch_norm(
@@ -75,13 +92,8 @@ def ClassificationBlock(feats, num_class, scope='classification'):
         feat_width = int(feats.shape[2])
         channels = int(feats.shape[3])
         avg_score = tf.nn.avg_pool(feats, [1, feat_height ,feat_width, 1], [1,1,1,1], 'VALID')
-        weight = tf.Variable(
-            tf.truncated_normal(shape=(channels, num_class), stddev=0.001),
-            name='cls_weight')
-        bias = tf.Variable(
-            tf.truncated_normal(shape=(1, num_class), stddev=0.001),
-            name='cls_bias')
-        clf_score = tf.add(tf.matmul(tf.reshape(avg_score, (-1,channels)), weight), bias)
+        x = tf.reshape(avg_score, (-1,channels))
+        clf_score = FcLayer(x, num_class, 'clf')
     return clf_score
 
 def ClassificationLoss(predict, target):
@@ -107,11 +119,12 @@ def DenseNet_CIFAR(imgData, growth_rate, phase, bottlenect=True, dropout=0.0):
     with tf.variable_scope('dense_net_cifar'):
         block0 = ConvLayer(imgData, 32 if bottlenect else 16, 3, 1, 'conv_input')
         # dense block
-        dense = DenseNetBody(block0, growth_rate, phase, [3,3,3], bottlenect, dropout)
+        dense = DenseNetBody(block0, growth_rate, phase, [6,6,6], bottlenect, dropout)
         # classification
         cls_score = ClassificationBlock(dense, 10)
     return cls_score
 
+# test unit
 if __name__ == '__main__':
     sess = tf.Session()
     target = tf.placeholder(tf.float32, (None, 10))

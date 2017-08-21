@@ -48,28 +48,24 @@ def PreprocessBatchData(labels, imgDatas):
     batch_size = len(labels)
     batch_labels = np.zeros((batch_size, NUM_CLASS), dtype=np.float32)
     batch_labels[np.arange(batch_size),labels] = 1.0
-    batch_imgDatas = np.stack(imgDatas).astype(np.float32)
+    batch_imgDatas = tf.concat([DataArguement(img) for img in imgDatas])
     return batch_labels,batch_imgDatas
 
 def DataArguement(imgData):
-    '''
     imgData = tf.image.random_flip_left_right(imgData)
     imgData = tf.image.random_brightness(imgData)
-    imgData = tf.image.random_contrast(imgData)
-    '''
+    imgData = tf.image.random_brightness(imgData, 0.2)
+    imgData = tf.image.random_contrast(imgData, 0.8, 1.2)
     pad_imgData = tf.image.resize_image_with_crop_or_pad(imgData, IMG_HEIGHT+8, IMG_WIDTH+8)
     crop_imgData = tf.random_crop(pad_imgData, [IMG_HEIGHT,IMG_WIDTH,IMG_CHN])
     return crop_imgData
 
-def Train(labels, imgDatas, num_epochs=300, batch_size=64, data_arguement=True):
+def Train(labels, imgDatas, num_epochs=300, batch_size=64):
     sess = tf.Session()
 
     target = tf.placeholder(tf.float32, (None, NUM_CLASS))
     imgData = tf.placeholder(tf.float32, (None, IMG_HEIGHT, IMG_WIDTH, IMG_CHN))
     phase = tf.placeholder(tf.bool)
-
-    if data_arguement:
-        imgData = DataArguement(imgData)
 
     cls_score = densenet.DenseNet_CIFAR(imgData, 12, phase)
     loss = densenet.ClassificationLoss(cls_score, target)
